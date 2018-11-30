@@ -11,6 +11,7 @@
 // Interrupt descriptor table (shared by all CPUs).
 struct gatedesc idt[256];
 extern uint vectors[];  // in vectors.S: array of 256 entry pointers
+extern int mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm);  // in vm.c
 struct spinlock tickslock;
 uint ticks;
 
@@ -87,12 +88,37 @@ trap(struct trapframe *tf)
       panic("trap");
     }
     // In user space, assume process misbehaved.
+	
+		// Page Fault, implement lazy page allocation.    
+		if(rcr2 () > myproc()->sz) {  // if the process address is out of updated range updated in sbrk()
+        cprintf("unhandled page fault.\n");
+    }
+    else {
+      if(tf->trapno == T_PGFLT) {	// add code original from allocuvm(), vm.c
+        char *mem;
+        uint addr;
+        if(myproc()->sz < myproc()->oldsz) {  // not dealing with process size shrink 
+          return;
+        }
+        addr = PGROUNDDOWN(rcr2());  // read cr2 register to find out what address the process is trying to access
+        mem = kalloc();
+        if(mem == 0) {
+          cprintf("allocuvm out of memory\n");
+          myproc()->killed = 1;
+          return;
+        }
+        memset(mem, 0, PGSIZE);
+        mappages(myproc()->pgdir, (char*)addr, PGSIZE, V2P(mem), PTE_W|PTE_U);
+        break;
+      }
+		}
+
     cprintf("pid %d %s: trap %d err %d on cpu %d "
             "eip 0x%x addr 0x%x--kill proc\n",
             myproc()->pid, myproc()->name, tf->trapno,
             tf->err, cpuid(), tf->eip, rcr2());
     myproc()->killed = 1;
-  }
+}
 
   // Force process exit if it has been killed and is in user space.
   // (If it is still executing in the kernel, let it keep running
