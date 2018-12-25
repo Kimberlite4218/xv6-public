@@ -89,6 +89,7 @@ trap(struct trapframe *tf)
     }
     // In user space, assume process misbehaved.
 	
+  // /*
 		// Page Fault, implement lazy page allocation.    
 		if(rcr2 () > myproc()->sz) {  // if the process address is out of updated range updated in sbrk()
         cprintf("unhandled page fault.\n");
@@ -112,6 +113,7 @@ trap(struct trapframe *tf)
         break;
       }
 		}
+     // */
 
     cprintf("pid %d %s: trap %d err %d on cpu %d "
             "eip 0x%x addr 0x%x--kill proc\n",
